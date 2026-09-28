@@ -18,6 +18,7 @@
  * Max ops: 7
  * Difficulty: 1
  */
+//按位与
 int bitAnd(int x, int y) {
     return ~(~x|~y);
 }
@@ -29,6 +30,7 @@ int bitAnd(int x, int y) {
  *   Max ops: 7
  *   Difficulty: 1
  */
+//异或操作
 int bitXor(int x, int y) {
     return ~(~x&~y)&~(x&y);
 }
@@ -49,6 +51,7 @@ int bitXor(int x, int y) {
  * Returns:
  *   1 if x and y have the same sign , 0 otherwise.
  */
+//是否同号，0单独考虑；其余数考虑符号位；
 int samesign(int x, int y) {
     if(!x&&!y){return 1;}
     if(!(x&&y)){return 0;}
@@ -66,6 +69,8 @@ int samesign(int x, int y) {
  *   Max ops: 25
  *   Difficulty: 4
  */
+//找到二进制下最高位的1所在位置，即可表示以2为底对数值；
+//采用二分法；
 int logtwo(int v) {
     int shift_num=0;
     int res=0;
@@ -95,6 +100,7 @@ int logtwo(int v) {
  *    Max ops: 17
  *    Difficulty: 2
  */
+//取位交换
 int byteSwap(int x, int n, int m) {
     int shift_n=n<<3;
     int shift_m=m<<3;
@@ -112,11 +118,14 @@ int byteSwap(int x, int n, int m) {
  *   Max ops: 30
  *   Difficulty: 3
  */
+//遍历取位逆序
 unsigned reverse(unsigned v) {
     unsigned a=0;
-    for (int i=0;i<32;i++){
+    unsigned cnt=0xffffffff;
+    while(cnt!=0){
         a=(a<<1)|(v&1);
         v=v>>1;
+        cnt=cnt<<1;
     }
     return a;
 }
@@ -129,6 +138,7 @@ unsigned reverse(unsigned v) {
  *   Max ops: 20
  *   Difficulty: 3
  */
+//右移n位，利用a改变int右移带符号问题
 int logicalShift(int x, int n) {
     int a=~((1<<31)>>n<<1);
     return (x>>n)&a;
@@ -142,12 +152,13 @@ int logicalShift(int x, int n) {
  *   Max ops: 50
  *   Difficulty: 4
  */
+//计数最左侧连续的1的数量；二分法；
 int leftBitCount(int x) {
     int cnt=0;
     int shift;
-    shift=!(~(x>>16))<<4;
+    shift=!(~(x>>16))<<4;//如果前16位都是1，则shift=16；
     cnt+=shift;
-    x=x<<shift;
+    x=x<<shift;//左移shift位
 
     shift=!(~(x>>24))<<3;
     cnt+=shift;
@@ -165,7 +176,7 @@ int leftBitCount(int x) {
     cnt+=shift;
     x=x<<shift;
 
-    cnt+=!(~(x>>31));
+    cnt+=!(~(x>>31));//最后剩余一位也可能是1
     return cnt;
 }
 
@@ -177,27 +188,33 @@ int leftBitCount(int x) {
  *   Max ops: 30
  *   Difficulty: 4
  */
+//将x转化为浮点数表示形式
 unsigned float_i2f(int x) {
     if(x==0){return 0;}
-    int S=0;
-    int E=31;
-    int M=0;
-    if(x<0){S=1;x=~(x-1);}
-    while(!(x>>E)){E--;}
-    int shift=E-23;
-    int extra_bits;
+    unsigned S=0;
+    unsigned E=31;
+    unsigned M=0;
+    unsigned abs_x=x;
+    if(x<0){S=1;abs_x=-abs_x;}
+    while(!(abs_x>>E)){E--;}//计算最高位1的位置，即指数
+    unsigned shift=E-23;
+    unsigned s=shift-1;
+    unsigned extra_bits=abs_x&((1<<s)-1);
+    unsigned R=((abs_x>>s)&1);
     if(E>23){
-        extra_bits=x&((1<<shift)-1);
-        M=x>>shift;
-        if((extra_bits>(1<<(shift-1)))||(extra_bits==(1<<(shift-1))&&(M&1))){
-            M++;
-            if(M>>24){E++;M=M&0x7FFFFF;}
+        M=(abs_x>>shift)&0x7FFFFF;
+        //考虑进位，如果舍弃位的最高位为1，看剩余舍弃位非0进位；如果是0，看保留位是1则进位。
+        if(R){
+            if(extra_bits==0){
+                if(M&1){M++;}
+            }else{M++;}
         }
+        if(M&0x800000){E++;}//M超过23位，向E进位
     }else{
-        M=x<<(-shift);
+        M=abs_x<<(-shift);
     }
     E+=127;
-    int res=(S<<31)|(E<<23)|(M&0x7FFFFF);
+    unsigned res=(S<<31)|(E<<23)|(M&0x7FFFFF);
     return res;
 }
 
@@ -212,11 +229,17 @@ unsigned float_i2f(int x) {
  *   Max ops: 30
  *   Difficulty: 4
  */
+//浮点数的两倍
 unsigned floatScale2(unsigned uf) {
     int S=uf>>31&1;
     int E=(uf>>23)&0xFF;
+    //考虑NaN和无穷
     if(E==0xFF){return uf;}
     int M=uf&0x7FFFFF;
+    if(E==0xFF){
+        return uf;
+    }
+    //考虑非规格化数
     if(E==0){
         M=M<<1;
         if(M&0x800000){E=1;M=M&0x7FFFFF;}
@@ -238,22 +261,19 @@ unsigned floatScale2(unsigned uf) {
  *   Max ops: 60
  *   Difficulty: 3
  */
+//将两个int类型拼接成32位浮点数
 int float64_f2i(unsigned uf1, unsigned uf2) {
     int S=(uf2>>31)&1;
     int E=(uf2>>20)&0x7FF;
     int M_higher=(uf2&0xFFFFF);
     int M_lower=uf1;
     int res;
-    if(E==0){return 0;}
-    if(E==0x7FF){return 0x80000000;}
+    if(!E){return 0;}
+    if(E>=0x7FF){return 0x80000000;}
     E=E-1023;
     if(E<0){return 0;}
     if(E>=31){
-        if(E==31&&S&&M_higher==0&&M_lower==0){
-            return 0x80000000;
-        }else{
-            return 0x80000000;
-        }
+        return 0x80000000;
     }
     int shift_extra=52-E;
     if(shift_extra<=32){
@@ -283,6 +303,7 @@ int float64_f2i(unsigned uf1, unsigned uf2) {
  *   Max ops: 30
  *   Difficulty: 4
  */
+//2的x次方，即二进制下，第x位置1；浮点数表示。
 unsigned floatPower2(int x) {
     int E;
     if(x>127){return 0x7F800000;}
